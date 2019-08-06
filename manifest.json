@@ -2,7 +2,7 @@
     "version": 0,
 
     "tools": {
-        "pinger": {
+        "mxs": {
             "label": "MatrixShield",
             "path": "mxs.html"
         }

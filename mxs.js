@@ -99,24 +99,6 @@ function ping_output(data) {
     output.append(document.createTextNode(data));
 }
 
-function handleFileSelect(evt) {
-  var f = evt.target.files[0]; // FileList object
-  var reader = new FileReader();
- reader.onload = (function(theFile) {
-         return function(e) {
-         var binaryData = e.target.result;
-                     //Converting Binary Data to base 64
-         var base64String = window.btoa(binaryData);
-                     //           //                               //showing file converted to base64
-         document.getElementById('base64').value = base64String;
-         };
-   })(f);
-                     //                                   // Read in the image file as a data URL.
-  reader.readAsBinaryString(f);
-  // Closure to capture the file information.
-  //
-}
-
 function readBlob() {
     var files = document.getElementById('files').files;
     if (!files.length) {
@@ -131,31 +113,52 @@ function readBlob() {
     cockpit.script('mkdir -p '+installerPath);
     cockpit.script('rm -f ' + installerPath + installerName);
 
-    
+    let start = 0;
+    let length = 10000000;
 
     var reader = new FileReader();
     reader.onloadend = function(evt) {
       if (evt.target.readyState == FileReader.DONE) { 
-       
-        cockpit.file("/tmp/upload/temp.txt").replace(evt.target.result)
-        .done(function (tag) {
-          cockpit.script('base64 --decode /tmp/upload/temp.txt > ' + installerPath + installerName);
-          cockpit.script('rm -f /tmp/upload/temp.txt ');
-          alert('Upload Complete');
-          location.reload();
-        })
-        .fail(function (error) {
-        });
-        
-  /*
-  cockpit.file("/tmp/test").replace(data)
-      .done(function (tag) {
-      })
-      .fail(function (error) {
-      });*/
+        let text = evt.target.result;
+        start = 0;
+        writeBlob(start, Math.min(length, text.length - start*length), text, file.name);                
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file);  
+}
+
+function writeBlob(start, length, text, filename){
+   let readLength = (start + 1) * length < text.length ? length: text.length - start * length;
+   let data = text.substr(start*length, readLength);
+   let proc = cockpit.file("/tmp/upload/"+start.toString()).replace(data);
+   proc.done(()=>{
+    if ((start + 1) * length >= text.length){
+        alert('Done Upload');
+        combineBlob(0, start, filename);
+    }else {
+      start ++;
+      writeBlob (start, length, text, filename);  
+    }
+
+  });
+}
+
+function combineBlob(start, end, filename){
+  let proc = cockpit.script("cat /tmp/upload/" + start.toString() + " >> /tmp/upload/result");
+  proc.done(()=>{
+    if (start < end){
+      combineBlob(start+1, end, filename);
+
+    }else {
+      
+      let installerFilename = filename.substr(filename, filename.length-1);
+      let proc = cockpit.script("base64 --decode /tmp/upload/result > "+installerPath + installerFilename);
+      proc.done(()=>{
+        cockpit.script("rm -f /tmp/upload/*")
+      });
+      alert('Done Combine');
+    }
+  });
   
 }
 
