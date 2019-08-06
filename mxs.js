@@ -75,29 +75,29 @@ installerLS.done(function(data) {
 //document.getElementById("ping").addEventListener("click", ping_run);
 document.getElementById('upload').addEventListener('click', readBlob);
 
-function ping_run() {
-    var proc = cockpit.spawn(["ping", "-c", "4", address.value]);
-    proc.done(ping_success);
-    proc.stream(ping_output);
-    proc.fail(ping_fail);
+// function ping_run() {
+//     var proc = cockpit.spawn(["ping", "-c", "4", address.value]);
+//     proc.done(ping_success);
+//     proc.stream(ping_output);
+//     proc.fail(ping_fail);
 
-    result.innerHTML = "";
-    output.innerHTML = "";
-}
+//     result.innerHTML = "";
+//     output.innerHTML = "";
+// }
 
-function ping_success() {
-    result.style.color = "green";
-    result.innerHTML = "success";
-}
+// function ping_success() {
+//     result.style.color = "green";
+//     result.innerHTML = "success";
+// }
 
-function ping_fail() {
-    result.style.color = "red";
-    result.innerHTML = "fail";
-}
+// function ping_fail() {
+//     result.style.color = "red";
+//     result.innerHTML = "fail";
+// }
 
-function ping_output(data) {
-    output.append(document.createTextNode(data));
-}
+// function ping_output(data) {
+//     output.append(document.createTextNode(data));
+// }
 
 function readBlob() {
     var files = document.getElementById('files').files;
@@ -120,8 +120,14 @@ function readBlob() {
     reader.onloadend = function(evt) {
       if (evt.target.readyState == FileReader.DONE) { 
         let text = evt.target.result;
-        start = 0;
-        writeBlob(start, Math.min(length, text.length - start*length), text, file.name);                
+        try {
+          window.atob(text);
+          start = 0;
+          writeBlob(start, Math.min(length, text.length - start*length), text, file.name); 
+        } catch(e) {
+           alert('Wrong format');
+        }
+                       
       }
     };
     reader.readAsText(file);  
@@ -130,10 +136,13 @@ function readBlob() {
 function writeBlob(start, length, text, filename){
    let readLength = (start + 1) * length < text.length ? length: text.length - start * length;
    let data = text.substr(start*length, readLength);
+   let uploadStatus = Math. min( Math.floor( (start + 1) * 100 / ( text.length / length)), 100);
+   uploadStatus = uploadStatus.toString() + "%";
+   document.getElementById("uploadStatus").textContent = uploadStatus;
    let proc = cockpit.file("/tmp/upload/"+start.toString()).replace(data);
    proc.done(()=>{
     if ((start + 1) * length >= text.length){
-        alert('Done Upload');
+        document.getElementById("uploadStatus").textContent = '100%';
         combineBlob(0, start, filename);
     }else {
       start ++;
@@ -154,9 +163,13 @@ function combineBlob(start, end, filename){
       let installerFilename = filename.substr(filename, filename.length-1);
       let proc = cockpit.script("base64 --decode /tmp/upload/result > "+installerPath + installerFilename);
       proc.done(()=>{
-        cockpit.script("rm -f /tmp/upload/*")
+        let delproc = cockpit.script("rm -f /tmp/upload/*");
+        delproc.done(()=>{
+          alert('Upload Complete');
+          location.reload();
+        });
       });
-      alert('Done Combine');
+      
     }
   });
   
